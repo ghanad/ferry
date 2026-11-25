@@ -19,7 +19,9 @@ builds a single static binary; you download it and run the installer.
 ## What you need
 
 - A **Mac** with Terminal (for `scp`).
-- A **private GitHub repository** containing this project.
+- A **private GitHub repository** containing this project, and the release
+  archive (`ferry-v1.0.0-linux-amd64.tar.gz`, or `arm64` for ARM servers)
+  downloaded from that repository's **Releases** page.
 - An **Ubuntu Server 24.04 LTS** VPS (amd64 or arm64) with at least 20 GB free
   disk and root/sudo access.
 - A **Docker Hub** account and a **private repository named `ferry`**.
@@ -65,39 +67,7 @@ them, verifies they are tidy, and builds a static binary.
 
 ---
 
-## Step 1 — Create a release and download the binary
-
-1. In the repository, click **Releases** (right sidebar) → **Draft a new
-   release**.
-2. Click **Choose a tag**, type `v1.0.0`, and click **Create new tag on
-   publish**.
-3. Title: `v1.0.0`. Click **Publish release**.
-4. A new **Build Ferry** run starts for the tag. Wait for it to finish.
-5. Reload the release page. Under **Assets** you should see:
-   - `ferry-v1.0.0-linux-amd64.tar.gz`
-   - `ferry-v1.0.0-linux-amd64.tar.gz.sha256`
-   - `ferry-v1.0.0-linux-arm64.tar.gz`
-   - `ferry-v1.0.0-linux-arm64.tar.gz.sha256`
-6. Download the `amd64` archive (use `arm64` only for ARM servers).
-
-For a normal push to `main` (no tag), the packages are **not** on the Releases
-page. Open **Actions → the run → Artifacts** and download
-`ferry-<short-sha>-linux-amd64`. Those artifacts expire after **30 days**.
-
-Each archive contains:
-
-```text
-ferry
-deploy/install.sh
-deploy/ferry.service
-deploy/ferry.env.example
-deploy/Caddyfile.example
-README.md
-```
-
----
-
-## Step 2 — Create the private Docker Hub repository and token
+## Step 1 — Create the private Docker Hub repository and token
 
 1. Log in at <https://hub.docker.com>.
 2. **Repositories → Create repository**.
@@ -107,14 +77,14 @@ README.md
 6. Copy the token immediately (Docker Hub shows it once).
 
 Keep the token somewhere safe for now. You will paste it into
-`/etc/ferry/ferry.env` as `DOCKERHUB_TOKEN` in Step 5, after the installer has
+`/etc/ferry/ferry.env` as `DOCKERHUB_TOKEN` in Step 4, after the installer has
 created that file.
 
 Do **not** use your Docker Hub account password as the token.
 
 ---
 
-## Step 3 — Copy the archive to the server
+## Step 2 — Copy the archive to the server
 
 On your Mac, in Terminal, from the folder where the archive was downloaded
 (usually `~/Downloads`):
@@ -158,7 +128,7 @@ It must print `OK` (run it in `/tmp` where the archive is).
 
 ---
 
-## Step 4 — Run the installer
+## Step 3 — Run the installer
 
 ```bash
 cd ~/ferry-v1.0.0
@@ -196,7 +166,7 @@ Expected output on first install:
 
 ---
 
-## Step 5 — Edit the configuration
+## Step 4 — Edit the configuration
 
 ```bash
 sudo nano /etc/ferry/ferry.env
@@ -257,7 +227,7 @@ Then remove or comment out `FERRY_PASSWORD`. If both are set, the hash wins.
 
 ---
 
-## Step 6 — Start Ferry
+## Step 5 — Start Ferry
 
 ```bash
 sudo systemctl restart ferry
@@ -314,7 +284,7 @@ firewall in their web console. Open TCP 8080 there too.
 
 ---
 
-## Step 7 — Optional automatic HTTPS with Caddy
+## Step 6 — Optional automatic HTTPS with Caddy
 
 You need a domain name. Create a DNS **A record** pointing at the server's IPv4
 address (and AAAA for IPv6). Wait until it resolves:
