@@ -1,9 +1,12 @@
 name: Build Ferry
 
 on:
+  # Commits only run the test job. Packages are built for version tags, or
+  # when someone explicitly starts the workflow by hand.
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 # The build job only reads the repository. The release job needs write access.
@@ -47,6 +50,7 @@ jobs:
   build:
     name: Package (${{ matrix.goarch }})
     needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
