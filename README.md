@@ -65,33 +65,7 @@ them, verifies they are tidy, and builds a static binary.
 
 ---
 
-## Step 1 — Put the project on GitHub
-
-1. In a browser, open <https://github.com/new>.
-2. Repository name: `ferry`. Select **Private**. Do **not** add a README,
-   `.gitignore`, or license. Click **Create repository**.
-3. On the empty repository page click **Add file → Upload files**.
-4. Drag the whole project folder contents (not the folder itself) into the
-   browser. Make sure these are included:
-   - `go.mod`, `go.sum`
-   - `cmd/`, `internal/`, `web/`
-   - `deploy/`, `.github/`
-   - `README.md`, `.gitignore`
-5. Click **Commit changes**.
-6. Open the **Actions** tab. A run named **Build Ferry** starts automatically.
-   Wait until both **Vet and test** and **Package (amd64)** / **Package (arm64)**
-   show green check marks. A first run takes a few minutes.
-
-If the run is red, click it, open the failing step, and read the last lines.
-The most common cause is a missing file in the upload.
-
-> Never commit real secrets. `.gitignore` already excludes `.env`, `*.env`,
-> `data/`, and the built `ferry` binary. Configuration lives only on the server
-> in `/etc/ferry/ferry.env`.
-
----
-
-## Step 2 — Create a release and download the binary
+## Step 1 — Create a release and download the binary
 
 1. In the repository, click **Releases** (right sidebar) → **Draft a new
    release**.
@@ -123,7 +97,7 @@ README.md
 
 ---
 
-## Step 3 — Create the private Docker Hub repository and token
+## Step 2 — Create the private Docker Hub repository and token
 
 1. Log in at <https://hub.docker.com>.
 2. **Repositories → Create repository**.
@@ -133,14 +107,14 @@ README.md
 6. Copy the token immediately (Docker Hub shows it once).
 
 Keep the token somewhere safe for now. You will paste it into
-`/etc/ferry/ferry.env` as `DOCKERHUB_TOKEN` in Step 6, after the installer has
+`/etc/ferry/ferry.env` as `DOCKERHUB_TOKEN` in Step 5, after the installer has
 created that file.
 
 Do **not** use your Docker Hub account password as the token.
 
 ---
 
-## Step 4 — Copy the archive to the server
+## Step 3 — Copy the archive to the server
 
 On your Mac, in Terminal, from the folder where the archive was downloaded
 (usually `~/Downloads`):
@@ -184,7 +158,7 @@ It must print `OK` (run it in `/tmp` where the archive is).
 
 ---
 
-## Step 5 — Run the installer
+## Step 4 — Run the installer
 
 ```bash
 cd ~/ferry-v1.0.0
@@ -222,7 +196,7 @@ Expected output on first install:
 
 ---
 
-## Step 6 — Edit the configuration
+## Step 5 — Edit the configuration
 
 ```bash
 sudo nano /etc/ferry/ferry.env
@@ -283,7 +257,7 @@ Then remove or comment out `FERRY_PASSWORD`. If both are set, the hash wins.
 
 ---
 
-## Step 7 — Start Ferry
+## Step 6 — Start Ferry
 
 ```bash
 sudo systemctl restart ferry
@@ -340,7 +314,7 @@ firewall in their web console. Open TCP 8080 there too.
 
 ---
 
-## Step 8 — Optional automatic HTTPS with Caddy
+## Step 7 — Optional automatic HTTPS with Caddy
 
 You need a domain name. Create a DNS **A record** pointing at the server's IPv4
 address (and AAAA for IPv6). Wait until it resolves:
