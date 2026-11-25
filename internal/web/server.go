@@ -17,6 +17,7 @@ import (
 	"ferry/internal/config"
 	"ferry/internal/db"
 	"ferry/internal/jobs"
+	"ferry/internal/update"
 	"ferry/internal/uploads"
 	webassets "ferry/web"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	limiter *auth.Limiter
 	uploads *uploads.Service
 	jobs    *jobs.Manager
+	updates *update.Watcher
 	logger  *slog.Logger
 
 	templates *template.Template
@@ -39,7 +41,8 @@ type Server struct {
 
 // New parses embedded assets and returns a server.
 func New(cfg *config.Config, store *db.Store, sessions *auth.Manager,
-	uploadSvc *uploads.Service, manager *jobs.Manager, logger *slog.Logger, version string) (*Server, error) {
+	uploadSvc *uploads.Service, manager *jobs.Manager, logger *slog.Logger, version string,
+	updates *update.Watcher) (*Server, error) {
 
 	funcs := template.FuncMap{
 		"version":    func() string { return version },
@@ -65,6 +68,7 @@ func New(cfg *config.Config, store *db.Store, sessions *auth.Manager,
 		limiter:   auth.NewLimiter(),
 		uploads:   uploadSvc,
 		jobs:      manager,
+		updates:   updates,
 		logger:    logger,
 		templates: tmpl,
 		static:    staticHandler,

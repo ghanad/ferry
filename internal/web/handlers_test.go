@@ -15,6 +15,7 @@ import (
 	"ferry/internal/config"
 	"ferry/internal/db"
 	"ferry/internal/jobs"
+	"ferry/internal/update"
 )
 
 func newTestServer(t *testing.T) (*Server, *db.Store, *jobs.Manager) {
@@ -28,7 +29,7 @@ func newTestServer(t *testing.T) (*Server, *db.Store, *jobs.Manager) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := &config.Config{DataDir: dir, MaxTotalBytes: 1 << 30}
 	manager := jobs.New(cfg, store, nil, nil, nil, logger)
-	server, err := New(cfg, store, nil, nil, manager, logger, "test")
+	server, err := New(cfg, store, nil, nil, manager, logger, "test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,5 +87,34 @@ func TestDiscardHandlerRemovesQueuedJob(t *testing.T) {
 	}
 	if _, err := store.GetJob(ctx, id); !errors.Is(err, db.ErrNotFound) {
 		t.Fatalf("GetJob after discard = %v, want ErrNotFound", err)
+	}
+}
+
+func TestIndexShowsUpdateBanner(t *testing.T) {
+	server, _, _ := newTestServer(t)
+	releaseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"tag_name":"v9.9.9","html_url":"https://example.test/release"}`))
+	}))
+	t.Cleanup(releaseServer.Close)
+
+	checker := update.New("")
+	checker.APIBase = releaseServer.URL
+	watcher := update.NewWatcher(checker, "v1.0.0")
+	watcher.Refresh(context.Background())
+	server.updates = watcher
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	server.handleIndex(rec, req, &auth.Session{Username: "dev", CSRF: "token"})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "newer Ferry release is available") {
+		t.Fatal("home page does not show the update banner")
+	}
+	if !strings.Contains(body, "https://example.test/release") {
+		t.Fatal("update banner does not link to the release")
 	}
 }

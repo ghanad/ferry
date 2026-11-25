@@ -46,6 +46,8 @@ accurate, but do not turn it into developer documentation.
 - Builds a `busybox:stable`-based image with one layer per file, pushes it to a
   private Docker Hub repository, verifies the pushed digest, and records the tag.
 - Job history, cancel, delete image tag, delete record, retention cleanup.
+- Update check against GitHub Releases (`ferry check-update`) plus a cached
+  "newer release" banner on the home page.
 - Restart recovery, stale-draft cleanup, orphan-directory cleanup.
 - A destination-side `ferry unpack` command shipped inside packed images.
 
@@ -71,6 +73,7 @@ accurate, but do not turn it into developer documentation.
 | Build (dev version) | `CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=dev" -o ferry ./cmd/ferry` |
 | Run locally | see below |
 | Version | `./ferry --version` |
+| Check for a newer release | `./ferry check-update` |
 | Hash a password | `./ferry hash-password` |
 | Unpack an image's files | `./ferry unpack --dir ./ferry-files` |
 | Validate installer syntax | `bash -n deploy/install.sh` |
@@ -118,7 +121,7 @@ The same environment variables work for `go build`, `go vet`, and `go run`.
 ## 3. Repository map
 
 ```text
-cmd/ferry/            main, CLI (--version, hash-password, unpack), wiring, graceful shutdown
+cmd/ferry/            main, CLI (--version, hash-password, unpack, check-update), wiring, graceful shutdown
 internal/config/      environment parsing and aggregated validation
 internal/auth/        signed session cookie, bcrypt/constant-time login, IP throttling
 internal/db/          SQLite schema, migrations, job/upload/file queries
@@ -129,6 +132,7 @@ internal/securefile/  streaming AES-256-GCM file encryption format
 internal/secretbox/   encrypts the job passphrase at rest
 internal/dockerhub/   Docker Hub tag deletion over the HTTP API
 internal/jobs/        single worker, queue, cancel, recovery, cleanup, retention
+internal/update/      GitHub release check and cached update status
 internal/safename/    filename sanitization, uniqueness, job-path containment
 internal/web/         routes, HTML handlers, JSON API, CSRF, security headers
 web/                  //go:embed templates and static assets
@@ -141,14 +145,14 @@ deploy/               systemd unit, installer, env example, Caddy example
 ### Dependency direction
 
 ```text
-cmd/ferry -> config, auth, db, uploads, downloader, imagebuild, dockerhub, jobs, web
-web       -> auth, config, db, downloader, jobs, uploads, web(assets)
+cmd/ferry -> config, auth, db, uploads, downloader, imagebuild, dockerhub, jobs, update, web
+web       -> auth, config, db, downloader, jobs, update, uploads, web(assets)
 jobs      -> config, db, dockerhub, downloader, imagebuild, safename, secretbox
 uploads   -> db, safename
 imagebuild-> safename, securefile
 config    -> auth (only for bcrypt hash validation)
 downloader-> safename
-leaves    -> auth, db, dockerhub, safename, secretbox, securefile (no internal imports)
+leaves    -> auth, db, dockerhub, safename, secretbox, securefile, update (no internal imports)
 ```
 
 Do not introduce cycles. `internal/web` and `cmd/ferry` are the only places that
@@ -318,6 +322,7 @@ problem into one actionable error. Secrets are never logged.
 | `DOCKERHUB_REPO` | `ferry` | Single lowercase repository name |
 | `FERRY_RETENTION_DAYS` | `0` | `0` disables automatic tag cleanup |
 | `FERRY_DOMAIN` | empty | Informational for the Caddy example; unused by Ferry |
+| `GITHUB_TOKEN` | empty | Optional; read-only token for the private release repository, used by `ferry check-update` and the home-page update banner. Never logged. |
 
 Rules for adding a variable:
 

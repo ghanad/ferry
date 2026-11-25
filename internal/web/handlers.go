@@ -28,6 +28,10 @@ type indexView struct {
 	CurrentProgress jobs.Progress
 	QueuedCount     int
 	Error           string
+
+	UpdateAvailable bool
+	LatestVersion   string
+	UpdateURL       string
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, session *auth.Session) {
@@ -38,6 +42,13 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, session *au
 		return
 	}
 	view := indexView{User: session.Username, CSRF: session.CSRF}
+	if s.updates != nil {
+		if status := s.updates.Status(); status.UpdateAvailable {
+			view.UpdateAvailable = true
+			view.LatestVersion = status.Latest
+			view.UpdateURL = status.URL
+		}
+	}
 	// Show the oldest queued or running job even when the worker has not
 	// picked it up yet, so reloading the page always surfaces an unfinished
 	// transfer.

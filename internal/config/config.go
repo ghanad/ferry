@@ -51,6 +51,10 @@ type Config struct {
 
 	RetentionDays int
 	Domain        string
+
+	// GitHubToken is optional. It lets the update check read releases from the
+	// GitHub repository when that repository is private. It is never logged.
+	GitHubToken string
 }
 
 // Load reads the process environment. It returns one aggregated, actionable
@@ -188,6 +192,7 @@ func Load() (*Config, error) {
 		DockerHubRepo:     hubRepo,
 		RetentionDays:     retention,
 		Domain:            strings.TrimSpace(os.Getenv("FERRY_DOMAIN")),
+		GitHubToken:       strings.TrimSpace(os.Getenv("GITHUB_TOKEN")),
 	}, nil
 }
 

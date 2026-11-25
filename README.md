@@ -35,6 +35,7 @@ Ferry needs **outbound HTTPS (port 443)** to:
 
 - `registry-1.docker.io` and `auth.docker.io` — pushing image data
 - `hub.docker.com` — deleting tags
+- `api.github.com` — checking for newer releases (`ferry check-update`)
 - any public site you paste as a download URL
 
 Inbound, you only need the web port (8080), plus 80/443 if you enable Caddy.
@@ -44,7 +45,7 @@ Inbound, you only need the web port (8080), plus 80/443 if you enable Caddy.
 ## Project layout
 
 ```text
-cmd/ferry/            entrypoint, --version, hash-password, graceful shutdown
+cmd/ferry/            entrypoint, --version, check-update, hash-password, unpack, shutdown
 internal/config/      environment validation
 internal/auth/        signed sessions, bcrypt/constant-time login, throttling
 internal/db/          SQLite schema and metadata queries
@@ -55,6 +56,7 @@ internal/securefile/  streaming AES-256-GCM file encryption
 internal/secretbox/   encrypts the job passphrase at rest
 internal/dockerhub/   tag deletion through the Docker Hub HTTP API
 internal/jobs/        single worker, queue, cancel, recovery, cleanup, retention
+internal/update/      GitHub release check and cached update status
 internal/web/         HTML handlers, JSON API, CSRF and security headers
 web/templates/        embedded HTML templates
 web/static/           embedded CSS and vanilla JavaScript
@@ -205,6 +207,10 @@ Notes:
   `linux/arm64` if the destination machine is ARM.
 - `FERRY_RETENTION_DAYS=0` disables automatic Docker Hub cleanup. A positive
   number deletes image tags after that many days (checked hourly).
+- Optional: set `GITHUB_TOKEN` to a fine-grained GitHub token with **read-only
+  access to this repository**. `ferry check-update` and the "newer release"
+  banner on the home page use it. A public repository works without a token; a
+  private one needs this token.
 - In `nano`: save with `Ctrl+O`, press Enter, exit with `Ctrl+X`.
 
 ### Optional: store a bcrypt hash instead of a plain password
@@ -254,10 +260,11 @@ level=INFO msg="Ferry is running" addr=0.0.0.0:8080 ...
 
 Press `Ctrl+C` to stop following logs (Ferry keeps running).
 
-Check the version and health:
+Check the version, updates, and health:
 
 ```bash
 /usr/local/bin/ferry --version
+/usr/local/bin/ferry check-update
 curl http://127.0.0.1:8080/health
 ```
 
@@ -265,6 +272,7 @@ Expected:
 
 ```text
 ferry v1.0.0
+Ferry v1.0.0 is up to date (latest release: v1.0.0).
 ok
 ```
 
@@ -436,8 +444,15 @@ deleted"). A 401/403 means the token lacks **Read, Write, Delete** permission.
 
 ## Upgrading and rolling back
 
-Download the new release on your Mac, copy it, extract it, and run the same
-installer:
+Check whether a newer release exists:
+
+```bash
+ferry check-update
+```
+
+It exits `0` when you are current, `1` when a newer release exists, and `2` when
+the check itself failed. Then download the new release on your Mac, copy it,
+extract it, and run the same installer:
 
 ```bash
 # on the Mac
@@ -651,6 +666,14 @@ github.com/google/go-containerregistry@v0.20.3
 modernc.org/sqlite@v1.29.10
 golang.org/x/crypto@v0.31.0
 ```
+
+### `ferry check-update` fails or reports 404
+
+If the release repository is private, GitHub's API needs a token. Create a
+fine-grained token with read-only access to the repository, add it to
+`/etc/ferry/ferry.env` as `GITHUB_TOKEN=...`, and restart Ferry. A `401` means
+the token is invalid or expired; a `403` mentioning the rate limit means too
+many unauthenticated requests were made.
 
 ### The release has no assets
 

@@ -23,6 +23,7 @@ import (
 	"ferry/internal/downloader"
 	"ferry/internal/imagebuild"
 	"ferry/internal/jobs"
+	"ferry/internal/update"
 	"ferry/internal/uploads"
 	"ferry/internal/web"
 )
@@ -48,6 +49,8 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "check-update":
+			os.Exit(checkUpdateCommand(os.Args[2:]))
 		case "--help", "-help", "help":
 			printUsage()
 			return
@@ -67,6 +70,7 @@ Usage:
   ferry --version       print the version
   ferry hash-password   read a password from the terminal and print a bcrypt hash
   ferry unpack          verify, decrypt and decompress files inside an image
+  ferry check-update    ask GitHub whether a newer release is available
   ferry help            show this help
 
 The hash-password output is used as FERRY_PASSWORD_HASH in the environment file.
@@ -137,10 +141,15 @@ func run() error {
 	}
 	hub := dockerhub.New(cfg.DockerHubUsername, cfg.DockerHubToken)
 	manager := jobs.New(cfg, store, dl, builder, hub, logger)
-	server, err := web.New(cfg, store, sessions, uploadSvc, manager, logger, version)
+	updates := update.NewWatcher(update.New(cfg.GitHubToken), version)
+	server, err := web.New(cfg, store, sessions, uploadSvc, manager, logger, version, updates)
 	if err != nil {
 		return err
 	}
+
+	updateCtx, stopUpdates := context.WithCancel(context.Background())
+	defer stopUpdates()
+	updates.Start(updateCtx)
 
 	manager.Start()
 	if err := manager.Recover(context.Background()); err != nil {

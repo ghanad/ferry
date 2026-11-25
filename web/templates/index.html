@@ -24,6 +24,14 @@
   </header>
 
   <main class="page">
+    {{if .UpdateAvailable}}
+    <div class="alert alert-info" role="status">
+      A newer Ferry release is available:
+      <a href="{{.UpdateURL}}" rel="noreferrer noopener">{{.LatestVersion}}</a>.
+      You are running {{version}}.
+    </div>
+    {{end}}
+
     <section class="hero card">
       <div>
         <p class="eyebrow">Self-hosted transfer</p>
