@@ -35,7 +35,8 @@ Ferry needs **outbound HTTPS (port 443)** to:
 
 - `registry-1.docker.io` and `auth.docker.io` — pushing image data
 - `hub.docker.com` — deleting tags
-- `api.github.com` — checking for newer releases (`ferry check-update`)
+- `api.github.com` and `release-assets.githubusercontent.com` — checking for
+  and downloading newer releases (`ferry check-update`, `ferry self-update`)
 - any public site you paste as a download URL
 
 Inbound, you only need the web port (8080), plus 80/443 if you enable Caddy.
@@ -451,8 +452,30 @@ ferry check-update
 ```
 
 It exits `0` when you are current, `1` when a newer release exists, and `2` when
-the check itself failed. Then download the new release on your Mac, copy it,
-extract it, and run the same installer:
+the check itself failed.
+
+### Update in place (recommended)
+
+On the server, run:
+
+```bash
+sudo ferry self-update
+```
+
+This downloads the release archive for the server's architecture, verifies the
+published SHA-256 checksum, replaces `/usr/local/bin/ferry` atomically, and
+restarts the `ferry` service. A restart interrupts an active transfer, so wait
+for it to finish or use `--no-restart`. Use `--force` to reinstall the latest
+release. If the release repository is private, pass the token in the
+environment: `sudo GITHUB_TOKEN=... ferry self-update`.
+
+The installed build must already contain the `self-update` command. If it does
+not, do one manual update first; later updates can use `sudo ferry self-update`.
+
+### Manual update
+
+Download the new release on your Mac, copy it, extract it, and run the same
+installer:
 
 ```bash
 # on the Mac
@@ -674,6 +697,14 @@ fine-grained token with read-only access to the repository, add it to
 `/etc/ferry/ferry.env` as `GITHUB_TOKEN=...`, and restart Ferry. A `401` means
 the token is invalid or expired; a `403` mentioning the rate limit means too
 many unauthenticated requests were made.
+
+### `ferry self-update` fails
+
+Run it with `sudo`: it must be able to replace `/usr/local/bin/ferry` and
+restart the service. "no asset named ..." means the release has no build for
+this machine's architecture. A checksum mismatch means the download was
+corrupted or the release is incomplete; retry, and if it keeps failing, update
+manually.
 
 ### The release has no assets
 

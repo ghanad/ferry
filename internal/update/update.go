@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,28 @@ type Release struct {
 	Tag         string
 	URL         string
 	PublishedAt time.Time
+	Assets      []Asset
+}
+
+// Asset is a file attached to a GitHub release.
+type Asset struct {
+	Name string
+	// APIURL is the authenticated GitHub API download endpoint.
+	APIURL string
+	// BrowserURL is the public download link; it is empty for private
+	// repositories.
+	BrowserURL string
+	Size       int64
+}
+
+// AssetByName returns the asset with the given name.
+func (r Release) AssetByName(name string) (Asset, bool) {
+	for _, asset := range r.Assets {
+		if asset.Name == name {
+			return asset, true
+		}
+	}
+	return Asset{}, false
 }
 
 // Version is a parsed semantic version. Pre holds the pre-release suffix
@@ -151,6 +174,9 @@ type Checker struct {
 	Client *http.Client
 	// APIBase overrides the GitHub API root; tests use it with httptest.
 	APIBase string
+	// DownloadClient downloads release assets. The default client has no
+	// overall timeout, because a release archive can be several megabytes.
+	DownloadClient *http.Client
 }
 
 // New returns a Checker for the Ferry repository. token may be empty; the
@@ -215,6 +241,12 @@ func (c *Checker) Latest(ctx context.Context) (Release, error) {
 		TagName     string    `json:"tag_name"`
 		HTMLURL     string    `json:"html_url"`
 		PublishedAt time.Time `json:"published_at"`
+		Assets      []struct {
+			Name               string `json:"name"`
+			URL                string `json:"url"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+			Size               int64  `json:"size"`
+		} `json:"assets"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return Release{}, fmt.Errorf("decode GitHub response: %w", err)
@@ -223,12 +255,77 @@ func (c *Checker) Latest(ctx context.Context) (Release, error) {
 	if !ok {
 		return Release{}, fmt.Errorf("GitHub returned an unrecognized release tag %q", payload.TagName)
 	}
-	return Release{
+	release := Release{
 		Version:     parsed,
 		Tag:         payload.TagName,
 		URL:         payload.HTMLURL,
 		PublishedAt: payload.PublishedAt,
-	}, nil
+	}
+	for _, asset := range payload.Assets {
+		release.Assets = append(release.Assets, Asset{
+			Name:       asset.Name,
+			APIURL:     asset.URL,
+			BrowserURL: asset.BrowserDownloadURL,
+			Size:       asset.Size,
+		})
+	}
+	return release, nil
+}
+
+// maxAssetBytes bounds a release asset download.
+const maxAssetBytes = 256 << 20
+
+// DownloadAsset streams one release asset to w. It authenticates with the
+// checker token, which private repositories require.
+func (c *Checker) DownloadAsset(ctx context.Context, asset Asset, w io.Writer) error {
+	url := asset.APIURL
+	if url == "" {
+		url = asset.BrowserURL
+	}
+	if url == "" {
+		return fmt.Errorf("release asset %s has no download URL", asset.Name)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("build request for %s: %w", asset.Name, err)
+	}
+	req.Header.Set("Accept", "application/octet-stream")
+	req.Header.Set("User-Agent", "ferry-self-update")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	client := c.DownloadClient
+	if client == nil {
+		client = &http.Client{}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("download %s: %w", asset.Name, unwrapURLError(err))
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download %s: GitHub returned %s", asset.Name, resp.Status)
+	}
+
+	written, err := io.Copy(w, io.LimitReader(resp.Body, maxAssetBytes+1))
+	if err != nil {
+		return fmt.Errorf("download %s: %w", asset.Name, err)
+	}
+	if written > maxAssetBytes {
+		return fmt.Errorf("download %s: asset is larger than %d bytes", asset.Name, maxAssetBytes)
+	}
+	return nil
+}
+
+// unwrapURLError drops the request URL from transport errors so a temporary
+// signed download URL is not echoed into logs.
+func unwrapURLError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Err != nil {
+		return urlErr.Err
+	}
+	return err
 }
 
 // Status is the cached result of the most recent update check.

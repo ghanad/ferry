@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -67,6 +68,9 @@ func reportUpdate(ctx context.Context, stdout, stderr io.Writer, current string,
 	if update.Compare(parsed, release.Version) < 0 {
 		fmt.Fprintf(stdout, "A newer Ferry release is available: %s (this build is %s).\n", release.Tag, current)
 		fmt.Fprintf(stdout, "Download it from %s\n", release.URL)
+		if runtime.GOOS == "linux" {
+			fmt.Fprintln(stdout, "Install it with: sudo ferry self-update")
+		}
 		return 1
 	}
 	fmt.Fprintf(stdout, "Ferry %s is up to date (latest release: %s).\n", current, release.Tag)

@@ -1,8 +1,10 @@
 package update
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -222,5 +224,90 @@ func TestWatcherRecordsErrors(t *testing.T) {
 	}
 	if status.UpdateAvailable {
 		t.Error("UpdateAvailable must stay false when the check fails")
+	}
+}
+
+func TestLatestParsesAssets(t *testing.T) {
+	checker := newTestChecker(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"tag_name":"v1.2.0","assets":[{"name":"ferry-v1.2.0-linux-amd64.tar.gz","url":"https://api.example/assets/1","browser_download_url":"https://example.test/1","size":1234}]}`))
+	})
+	release, err := checker.Latest(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset, ok := release.AssetByName("ferry-v1.2.0-linux-amd64.tar.gz")
+	if !ok {
+		t.Fatal("asset was not parsed")
+	}
+	if asset.APIURL != "https://api.example/assets/1" || asset.BrowserURL != "https://example.test/1" || asset.Size != 1234 {
+		t.Errorf("asset = %+v", asset)
+	}
+	if _, ok := release.AssetByName("missing"); ok {
+		t.Error("AssetByName found an asset that does not exist")
+	}
+}
+
+func TestDownloadAsset(t *testing.T) {
+	var gotAccept, gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAccept = r.Header.Get("Accept")
+		gotAuth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte("archive-bytes"))
+	}))
+	t.Cleanup(server.Close)
+
+	checker := New("secret-token")
+	checker.DownloadClient = server.Client()
+	var buf bytes.Buffer
+	err := checker.DownloadAsset(context.Background(), Asset{Name: "a.tar.gz", APIURL: server.URL + "/asset"}, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != "archive-bytes" {
+		t.Errorf("body = %q", buf.String())
+	}
+	if gotAccept != "application/octet-stream" {
+		t.Errorf("Accept = %q", gotAccept)
+	}
+	if gotAuth != "Bearer secret-token" {
+		t.Errorf("Authorization = %q", gotAuth)
+	}
+}
+
+func TestDownloadAssetFallsBackToBrowserURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(server.Close)
+
+	checker := New("")
+	checker.DownloadClient = server.Client()
+	var buf bytes.Buffer
+	if err := checker.DownloadAsset(context.Background(), Asset{Name: "a", BrowserURL: server.URL}, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != "ok" {
+		t.Errorf("body = %q", buf.String())
+	}
+}
+
+func TestDownloadAssetErrorStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	checker := New("")
+	checker.DownloadClient = server.Client()
+	err := checker.DownloadAsset(context.Background(), Asset{Name: "a", APIURL: server.URL}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "404") {
+		t.Fatalf("error = %v, want a 404 error", err)
+	}
+}
+
+func TestDownloadAssetWithoutURL(t *testing.T) {
+	checker := New("")
+	if err := checker.DownloadAsset(context.Background(), Asset{Name: "a"}, io.Discard); err == nil {
+		t.Fatal("expected an error for an asset without a download URL")
 	}
 }

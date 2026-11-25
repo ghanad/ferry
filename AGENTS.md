@@ -48,6 +48,8 @@ accurate, but do not turn it into developer documentation.
 - Job history, cancel, delete image tag, delete record, retention cleanup.
 - Update check against GitHub Releases (`ferry check-update`) plus a cached
   "newer release" banner on the home page.
+- In-place self-update from the CLI (`sudo ferry self-update`): verifies the
+  published SHA-256, replaces the binary atomically, and restarts systemd.
 - Restart recovery, stale-draft cleanup, orphan-directory cleanup.
 - A destination-side `ferry unpack` command shipped inside packed images.
 
@@ -74,6 +76,7 @@ accurate, but do not turn it into developer documentation.
 | Run locally | see below |
 | Version | `./ferry --version` |
 | Check for a newer release | `./ferry check-update` |
+| Self-update (root, Linux) | `sudo ./ferry self-update` |
 | Hash a password | `./ferry hash-password` |
 | Unpack an image's files | `./ferry unpack --dir ./ferry-files` |
 | Validate installer syntax | `bash -n deploy/install.sh` |
@@ -121,7 +124,7 @@ The same environment variables work for `go build`, `go vet`, and `go run`.
 ## 3. Repository map
 
 ```text
-cmd/ferry/            main, CLI (--version, hash-password, unpack, check-update), wiring, graceful shutdown
+cmd/ferry/            main, CLI (--version, hash-password, unpack, check-update, self-update), wiring, shutdown
 internal/config/      environment parsing and aggregated validation
 internal/auth/        signed session cookie, bcrypt/constant-time login, IP throttling
 internal/db/          SQLite schema, migrations, job/upload/file queries
@@ -322,7 +325,7 @@ problem into one actionable error. Secrets are never logged.
 | `DOCKERHUB_REPO` | `ferry` | Single lowercase repository name |
 | `FERRY_RETENTION_DAYS` | `0` | `0` disables automatic tag cleanup |
 | `FERRY_DOMAIN` | empty | Informational for the Caddy example; unused by Ferry |
-| `GITHUB_TOKEN` | empty | Optional; read-only token for the private release repository, used by `ferry check-update` and the home-page update banner. Never logged. |
+| `GITHUB_TOKEN` | empty | Optional; read-only token for the private release repository, used by `ferry check-update`, `ferry self-update`, and the home-page update banner. Never logged. |
 
 Rules for adding a variable:
 
@@ -403,6 +406,8 @@ required placeholders remain.
   (`NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`,
   `ReadWritePaths=/var/lib/ferry`, etc.).
 - No Docker socket is used or needed anywhere.
+- The web app never replaces its own binary. `ferry self-update` is CLI-only,
+  requires root, and verifies the release SHA-256 before the atomic rename.
 
 ---
 
@@ -521,6 +526,9 @@ Rules:
   `/var/lib/ferry`, must install the binary atomically, and must not start the
   service while required placeholders remain.
 - Do not add a Dockerfile, compose file, or a Docker-based deployment path.
+- `ferry self-update` must stay root-only and CLI-only: it verifies the
+  published SHA-256, checks the new binary, renames atomically, and restarts
+  the `ferry` unit. Never expose binary replacement through the web API.
 
 ---
 
