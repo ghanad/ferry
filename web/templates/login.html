@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · Ferry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="brand brand-large">
+      <span class="brand-mark" aria-hidden="true">⛴</span>
+      <span>Ferry</span>
+    </div>
+    <h1>Log in</h1>
+    <p class="muted">Private file transfers through Docker Hub.</p>
+    {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
+    <form method="post" action="/login" class="stack">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" value="{{.Username}}" autocomplete="username" required autofocus>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button class="button button-primary button-full" type="submit">Log in</button>
+    </form>
+    <p class="fine-print">Single-user self-hosted instance. Sessions last 12 hours.</p>
+  </main>
+  <footer class="site-footer">Ferry {{version}}</footer>
+
+</body>
+</html>

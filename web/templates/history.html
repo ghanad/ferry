@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{.CSRF}}">
+  <title>History · Ferry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="history">
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">⛴</span>
+      <span>Ferry</span>
+    </a>
+    <nav class="site-nav">
+      <a href="/">New transfer</a>
+      <span class="user-chip">{{.User}}</span>
+      <form method="post" action="/logout" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{.CSRF}}">
+        <button type="submit" class="button button-quiet">Log out</button>
+      </form>
+    </nav>
+  </header>
+
+  <main class="page">
+    <div class="job-heading">
+      <div>
+        <p class="eyebrow">All transfers</p>
+        <h1>History</h1>
+      </div>
+    </div>
+
+    <div id="page-error" class="alert alert-error" role="alert" hidden></div>
+
+    <section class="card">
+      <div class="section-heading">
+        <h2>Docker Hub cleanup</h2>
+        <p class="muted">
+          {{if .RetentionDays}}Automatic cleanup is enabled for images older than {{.RetentionDays}} days.{{else}}Automatic cleanup is disabled (FERRY_RETENTION_DAYS=0).{{end}}
+        </p>
+      </div>
+      <form id="purge-form" class="input-row purge-form">
+        <label for="purge-days" class="visually-hidden">Delete images older than days</label>
+        <input id="purge-days" type="number" min="1" step="1" value="30" aria-label="Delete images older than days">
+        <button class="button button-danger" type="submit">Delete all images older than N days</button>
+      </form>
+      <p class="hint">This deletes tags from Docker Hub but keeps the history records.</p>
+    </section>
+
+    <section class="section">
+      {{if .Jobs}}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Started</th><th>State</th><th>Files</th><th>Size</th><th>Image</th><th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Jobs}}
+            <tr>
+              <td>{{time .CreatedAt}}</td>
+              <td><span class="badge badge-{{.State}}">{{state .State}}</span></td>
+              <td>{{.FileCount}}</td>
+              <td>{{bytes .TotalBytes}}</td>
+              <td class="mono wrap">
+                {{if .Image}}{{.Image}}{{else}}—{{end}}
+                {{if .ImageDeleted}}<span class="tag-note">image deleted</span>{{end}}
+              </td>
+              <td>
+                <div class="actions">
+                <a class="button button-small" href="/jobs/{{.ID}}">Open</a>
+                {{if and .Image (not .ImageDeleted)}}
+                <button class="button button-small button-danger js-delete-image" data-job-id="{{.ID}}" type="button">Delete image</button>
+                {{end}}
+                {{if isActive .State}}
+                <button class="button button-small button-danger js-cancel-job" data-job-id="{{.ID}}" type="button">Cancel</button>
+                {{else}}
+                <button class="button button-small button-quiet js-delete-record" data-job-id="{{.ID}}" type="button">Delete record</button>
+                {{end}}
+                </div>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <div class="empty-state">No transfers yet. <a href="/">Create one</a>.</div>
+      {{end}}
+    </section>
+  </main>
+
+  <footer class="site-footer">Ferry {{version}}</footer>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

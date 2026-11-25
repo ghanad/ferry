@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Ferry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">⛴</span>
+      <span>Ferry</span>
+    </a>
+    <nav class="site-nav"><a href="/">Home</a></nav>
+  </header>
+  <main class="page">
+    <section class="card">
+      <p class="eyebrow">{{.Title}}</p>
+      <h1>Something went wrong</h1>
+      <p class="alert alert-error">{{.Error}}</p>
+      <p><a class="button" href="/">Back to transfers</a></p>
+    </section>
+  </main>
+  <footer class="site-footer">Ferry {{version}}</footer>
+</body>
+</html>

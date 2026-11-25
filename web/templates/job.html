@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{.CSRF}}">
+  <title>Transfer · Ferry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="job" data-job-id="{{.JobID}}" data-max-bytes="{{.MaxTotalBytes}}">
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">⛴</span>
+      <span>Ferry</span>
+    </a>
+    <nav class="site-nav">
+      <a href="/history">History</a>
+      <span class="user-chip">{{.User}}</span>
+      <form method="post" action="/logout" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{.CSRF}}">
+        <button type="submit" class="button button-quiet">Log out</button>
+      </form>
+    </nav>
+  </header>
+
+  <main class="page">
+    <div class="job-heading">
+      <div>
+        <p class="eyebrow">Transfer</p>
+        <h1 class="mono wrap">{{.JobID}}</h1>
+      </div>
+      <span id="job-state" class="badge badge-draft" role="status" aria-live="polite">Loading…</span>
+    </div>
+
+    <div id="page-error" class="alert alert-error" role="alert" hidden></div>
+    <noscript><div class="alert alert-error">JavaScript is required to upload files and show live progress.</div></noscript>
+
+    <section id="draft-panel" class="card" hidden>
+      <div class="section-heading">
+        <h2>Add content</h2>
+        <p class="muted">Files upload in 8 MiB chunks and resume automatically after a dropped connection.</p>
+      </div>
+
+      <label id="dropzone" class="dropzone" for="file-input" tabindex="0" role="button" aria-controls="file-input">
+        <span class="dropzone-icon" aria-hidden="true">↑</span>
+        <span class="dropzone-title">Drop files here or click to choose</span>
+        <span class="muted">You can select several files at once.</span>
+      </label>
+      <input id="file-input" class="visually-hidden" type="file" multiple>
+
+      <div id="upload-list" class="entry-list" aria-live="polite"></div>
+
+      <form id="url-form" class="url-form">
+        <label for="url-input">Or add a public download URL</label>
+        <div class="input-row">
+          <input id="url-input" type="url" placeholder="https://example.com/file.zip" autocomplete="off" spellcheck="false">
+          <button class="button" type="submit">Add URL</button>
+        </div>
+        <p class="hint">Only public http/https addresses are allowed. Ferry blocks private and local network addresses.</p>
+      </form>
+
+      <div id="entry-list" class="entry-list"></div>
+
+      <details class="options">
+        <summary>Optional: compress and encrypt files</summary>
+        <div class="options-body">
+          <label for="passphrase">Passphrase</label>
+          <input id="passphrase" type="password" autocomplete="new-password" placeholder="Leave empty to keep a saved passphrase">
+          <label for="passphrase-confirm">Confirm passphrase</label>
+          <input id="passphrase-confirm" type="password" autocomplete="new-password" placeholder="Type it again">
+          <p class="hint">When set, every file is encrypted with AES-256-GCM before it is packed. The destination must unpack the image with this passphrase. <strong>There is no recovery if you forget it.</strong> Ferry stores only an encrypted copy of the passphrase and deletes it when the job ends.</p>
+          <label class="checkbox-row">
+            <input id="compress" type="checkbox">
+            <span>Compress files with gzip when it makes them smaller</span>
+          </label>
+          <label id="clear-passphrase-row" class="checkbox-row" hidden>
+            <input id="clear-passphrase" type="checkbox">
+            <span>Remove the saved passphrase (do not encrypt this job)</span>
+          </label>
+          <p id="options-state" class="hint"></p>
+        </div>
+      </details>
+
+      <div class="quota">
+        <div class="quota-label">
+          <strong id="total-text">0 B / {{.MaxTotalText}}</strong>
+          <span class="muted">Total job size</span>
+        </div>
+        <progress id="total-progress" max="{{.MaxTotalBytes}}" value="0" aria-label="Total job size"></progress>
+      </div>
+
+      <div class="start-row">
+        <button id="start-button" class="button button-primary button-large" type="button" disabled aria-describedby="start-hint">Start transfer</button>
+        <p id="start-hint" class="hint">Add at least one file or URL.</p>
+      </div>
+    </section>
+
+    <section id="run-panel" class="card" hidden>
+      <div class="section-heading">
+        <h2>Working</h2>
+        <p class="muted">This page refreshes every 2 seconds. You can leave it and come back later.</p>
+      </div>
+      <div class="progress-row">
+        <strong id="run-state" role="status" aria-live="polite">Queued</strong>
+        <span id="progress-percent" class="muted"></span>
+      </div>
+      <progress id="job-progress" max="100" value="0" aria-label="Transfer progress"></progress>
+      <p id="progress-text" class="muted">Waiting for the worker.</p>
+      <p id="run-options" class="hint" hidden></p>
+      <div class="start-row">
+        <button id="cancel-button" class="button button-danger" type="button">Cancel transfer</button>
+        <p class="hint">Cancelling stops the current step and deletes all temporary files.</p>
+      </div>
+      <h3>Log</h3>
+      <pre id="job-log" class="log">Waiting…</pre>
+    </section>
+
+    <section id="done-panel" class="card" hidden>
+      <div class="success-mark" aria-hidden="true">✓</div>
+      <h2>Image ready</h2>
+      <p>Your files are packed and pushed to your private Docker Hub repository.</p>
+      <div class="image-name-row">
+        <code id="image-name" class="image-name wrap"></code>
+        <button id="copy-image" class="button" type="button">Copy image name</button>
+      </div>
+      <p id="image-deleted-note" class="alert alert-warning" hidden>The image tag has been deleted from Docker Hub.</p>
+      <h3>On the destination machine</h3>
+      <pre id="pull-commands" class="commands"></pre>
+      <button id="copy-commands" class="button" type="button">Copy commands</button>
+      <p class="hint">Run <code>docker login</code> first if that machine is not logged in. The image is private, so the destination must have access to the same Docker Hub account.</p>
+      <h3>Log</h3>
+      <pre id="done-log" class="log"></pre>
+    </section>
+
+    <section id="failed-panel" class="card" hidden>
+      <div class="failure-mark" aria-hidden="true">!</div>
+      <h2>Transfer failed</h2>
+      <p id="failure-message" class="alert alert-error" role="alert"></p>
+      <p class="muted">The uploaded and downloaded files have already been deleted from the server. Fix the problem and create a new transfer.</p>
+      <h3>Log</h3>
+      <pre id="failed-log" class="log"></pre>
+    </section>
+  </main>
+
+  <footer class="site-footer">Ferry {{version}}</footer>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

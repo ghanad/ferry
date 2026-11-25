@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{.CSRF}}">
+  <title>Ferry · New transfer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="index">
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">⛴</span>
+      <span>Ferry</span>
+    </a>
+    <nav class="site-nav">
+      <a href="/history">History</a>
+      <span class="user-chip">{{.User}}</span>
+      <form method="post" action="/logout" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{.CSRF}}">
+        <button type="submit" class="button button-quiet">Log out</button>
+      </form>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero card">
+      <div>
+        <p class="eyebrow">Self-hosted transfer</p>
+        <h1>Pack files into a private image</h1>
+        <p class="lead">Add files or download links, press Start, and Ferry pushes them to your private Docker Hub repository. No Docker daemon is involved.</p>
+      </div>
+      <button id="new-transfer" class="button button-primary button-large" type="button">New transfer</button>
+    </section>
+
+    <div id="page-error" class="alert alert-error" role="alert" hidden></div>
+
+    {{if .Current}}
+    <section class="card current-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Working now</p>
+          <h2 class="mono wrap">{{.Current.ID}}</h2>
+        </div>
+        <span class="badge badge-{{.Current.State}}">{{state .Current.State}}</span>
+      </div>
+      <p class="muted">{{if .CurrentProgress.Text}}{{.CurrentProgress.Text}}{{else}}Starting…{{end}}</p>
+      {{if gt .CurrentProgress.Total 0}}
+      <progress max="{{.CurrentProgress.Total}}" value="{{.CurrentProgress.Done}}" aria-label="Current transfer progress"></progress>
+      <p class="hint">{{bytes .CurrentProgress.Done}} / {{bytes .CurrentProgress.Total}}</p>
+      {{end}}
+      <div class="start-row">
+        <a class="button button-primary" href="/jobs/{{.Current.ID}}">Open live view</a>
+        <button class="button button-danger js-cancel-job" data-job-id="{{.Current.ID}}" type="button">Cancel transfer</button>
+      </div>
+    </section>
+    {{end}}
+
+    <section class="section">
+      <div class="section-heading">
+        <h2>Draft transfers</h2>
+        <p class="muted">Drafts untouched for 24 hours are deleted automatically.</p>
+      </div>
+      {{if .Drafts}}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Created</th><th>State</th><th>Entries</th><th>Size</th><th class="actions-col">Actions</th></tr>
+          </thead>
+          <tbody>
+            {{range .Drafts}}
+            <tr>
+              <td>{{time .CreatedAt}}</td>
+              <td><span class="badge badge-draft">{{state .State}}</span></td>
+              <td>{{.FileCount}}</td>
+              <td>{{bytes .TotalBytes}}</td>
+              <td><div class="actions"><a class="button button-small" href="/jobs/{{.ID}}">Open</a></div></td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <div class="empty-state">No drafts. Create one to get started.</div>
+      {{end}}
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <h2>Recent transfers</h2>
+        <p><a href="/history">See full history</a></p>
+      </div>
+      {{if .Recent}}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Created</th><th>State</th><th>Files</th><th>Size</th><th>Image</th><th class="actions-col">Actions</th></tr>
+          </thead>
+          <tbody>
+            {{range .Recent}}
+            <tr>
+              <td>{{time .CreatedAt}}</td>
+              <td><span class="badge badge-{{.State}}">{{state .State}}</span></td>
+              <td>{{.FileCount}}</td>
+              <td>{{bytes .TotalBytes}}</td>
+              <td class="mono wrap">{{if .Image}}{{.Image}}{{else}}—{{end}}</td>
+              <td><div class="actions"><a class="button button-small" href="/jobs/{{.ID}}">Open</a></div></td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <div class="empty-state">No completed or running transfers yet.</div>
+      {{end}}
+    </section>
+  </main>
+
+  <footer class="site-footer">Ferry {{version}}</footer>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

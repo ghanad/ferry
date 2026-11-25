@@ -1,0 +1,12 @@
+# Copy to /etc/caddy/Caddyfile and set your real domain.
+# Before using HTTPS, edit /etc/ferry/ferry.env:
+#   FERRY_LISTEN_ADDR=127.0.0.1:8080
+#   FERRY_COOKIE_SECURE=true
+#   FERRY_TRUST_PROXY=true
+#   FERRY_DOMAIN=ferry.example.com
+# Then: sudo systemctl restart ferry && sudo systemctl reload caddy
+
+ferry.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}

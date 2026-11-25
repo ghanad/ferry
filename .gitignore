@@ -1,0 +1,12 @@
+.env
+.env.*
+*.env
+!.env.example
+data/
+.gocache/
+.testdata/
+/ferry
+*.db
+*.db-shm
+*.db-wal
+.DS_Store

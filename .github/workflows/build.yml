@@ -1,0 +1,144 @@
+name: Build Ferry
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# The build job only reads the repository. The release job needs write access.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Vet and test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+
+      # Dependencies are pinned in go.mod/go.sum. Download them and verify the
+      # module files are tidy instead of resolving versions at build time.
+      - name: Resolve dependencies
+        shell: bash
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          go mod download
+          go mod tidy
+
+      - name: Vet
+        env:
+          GOTOOLCHAIN: local
+        run: go vet ./...
+
+      - name: Test
+        env:
+          GOTOOLCHAIN: local
+        run: go test ./...
+
+  build:
+    name: Package (${{ matrix.goarch }})
+    needs: test
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+
+      - name: Decide version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="${GITHUB_SHA::7}"
+          fi
+          echo "value=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Resolve dependencies
+        shell: bash
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          go mod download
+          go mod tidy
+
+      - name: Build static binary
+        shell: bash
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          go build -trimpath \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o ferry ./cmd/ferry
+
+      - name: Package release archive
+        shell: bash
+        env:
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          package_dir="package"
+          rm -rf "${package_dir}"
+          mkdir -p "${package_dir}/deploy"
+          cp ferry "${package_dir}/ferry"
+          cp deploy/install.sh deploy/ferry.service deploy/ferry.env.example \
+            deploy/Caddyfile.example "${package_dir}/deploy/"
+          cp README.md "${package_dir}/README.md"
+          chmod 0755 "${package_dir}/ferry" "${package_dir}/deploy/install.sh"
+          archive="ferry-${VERSION}-linux-${GOARCH}.tar.gz"
+          tar -C "${package_dir}" -czf "${archive}" .
+          sha256sum "${archive}" > "${archive}.sha256"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ferry-${{ steps.version.outputs.value }}-linux-${{ matrix.goarch }}
+          path: |
+            ferry-${{ steps.version.outputs.value }}-linux-${{ matrix.goarch }}.tar.gz
+            ferry-${{ steps.version.outputs.value }}-linux-${{ matrix.goarch }}.tar.gz.sha256
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ferry-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
