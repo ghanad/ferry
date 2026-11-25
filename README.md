@@ -46,7 +46,7 @@ Inbound, you only need the web port (8080), plus 80/443 if you enable Caddy.
 ## Project layout
 
 ```text
-cmd/ferry/            entrypoint, --version, check-update, hash-password, unpack, shutdown
+cmd/ferry/            entrypoint, --version, check-update, hash-password, download, unpack, shutdown
 internal/config/      environment validation
 internal/auth/        signed sessions, bcrypt/constant-time login, throttling
 internal/db/          SQLite schema and metadata queries
@@ -392,6 +392,26 @@ internet, and that no other web server owns those ports.
 
 On the destination machine:
 
+The simplest way is one command, if a `ferry` binary for that machine is
+available (the Linux release archive includes it; on macOS or Windows use the
+Docker steps below):
+
+```bash
+ferry download youruser/ferry:job-20261124-153012-a1b2
+```
+
+It pulls the image straight from Docker Hub **without Docker**, verifies the
+checksums, decrypts and decompresses as needed, and leaves the files in
+`./job-20261124-153012-a1b2`. A private image needs credentials: pass
+`--username`/`--password`, set `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`, or run
+`docker login` once so the stored credentials are reused. Useful flags:
+`--dir <folder>` to choose the destination, `--force` to replace an existing
+folder, `--verify-only` to stop after verification, and `--passphrase '...'` for
+non-interactive decryption. Nothing is written outside the destination folder,
+and no local image is kept.
+
+If you prefer Docker, the manual steps are:
+
 ```bash
 docker login
 docker pull youruser/ferry:job-20261124-153012-a1b2
@@ -420,7 +440,8 @@ cd ferry-files
 `ferry unpack` verifies `SHA256SUMS`/`MD5SUMS`, decrypts `.ferry` files
 (prompting for the passphrase), decompresses `.gz` files, and writes the
 original filenames. Use `--verify-only` to check without unpacking, or
-`--passphrase '...'` for non-interactive use.
+`--passphrase '...'` for non-interactive use. `ferry download` runs the pull,
+verification, and unpack in one step.
 
 The image contains `data/SHA256SUMS`, `data/MD5SUMS`,
 `data/FERRY-MANIFEST.json`, and one layer per file.
@@ -565,9 +586,9 @@ Use a small private `ferry` repository while testing.
    413 and a readable message.
 7. **Successful push** — with real Docker Hub credentials, finish a job and
    confirm the image appears in the private Docker Hub repository.
-8. **Pull and verify** — on another machine run the commands from the done
-   page. `sha256sum -c SHA256SUMS` prints `OK` for every file, and
-   `md5sum -c MD5SUMS` does too.
+8. **Pull and verify** — on another machine run `ferry download <image>` (or
+   the Docker commands from the done page). `sha256sum -c SHA256SUMS` prints
+   `OK` for every file, and `md5sum -c MD5SUMS` does too.
 9. **Compress and encrypt** — create a job with a passphrase and compression
    enabled, upload a text file, finish the push, pull it elsewhere, run
    `./ferry unpack`, enter the passphrase, and confirm the original file is

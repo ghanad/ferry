@@ -129,7 +129,7 @@
       <h3>On the destination machine</h3>
       <pre id="pull-commands" class="commands"></pre>
       <button id="copy-commands" class="button" type="button">Copy commands</button>
-      <p class="hint">Run <code>docker login</code> first if that machine is not logged in. The image is private, so the destination must have access to the same Docker Hub account.</p>
+      <p class="hint">Run <code>docker login</code> first if that machine is not logged in. The image is private, so the destination must have access to the same Docker Hub account. If the <code>ferry</code> binary is installed there, <code>ferry download &lt;image name&gt;</code> pulls, verifies, and unpacks in one step without Docker.</p>
       <p class="hint">Deleting this transfer removes only the history record. Use <strong>Delete image</strong> on the History page to remove the Docker Hub tag.</p>
       <button class="button button-quiet js-discard-job" data-job-id="{{.JobID}}" type="button">Delete this transfer</button>
       <h3>Log</h3>

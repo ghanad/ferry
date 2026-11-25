@@ -49,6 +49,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "download":
+			if err := downloadCommand(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Download failed: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		case "check-update":
 			os.Exit(checkUpdateCommand(os.Args[2:]))
 		case "self-update":
@@ -75,7 +81,8 @@ Usage:
   ferry                 start the web server (configuration comes from environment variables)
   ferry --version       print the version
   ferry hash-password   read a password from the terminal and print a bcrypt hash
-  ferry unpack          verify, decrypt and decompress files inside an image
+  ferry download IMAGE  pull an image and extract its files (no Docker needed)
+  ferry unpack          verify, decrypt and decompress already extracted files
   ferry check-update    ask GitHub whether a newer release is available
   ferry self-update     download and install the newest release (run with sudo)
   ferry help            show this help

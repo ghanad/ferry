@@ -51,7 +51,9 @@ accurate, but do not turn it into developer documentation.
 - In-place self-update from the CLI (`sudo ferry self-update`): verifies the
   published SHA-256, replaces the binary atomically, and restarts systemd.
 - Restart recovery, stale-draft cleanup, orphan-directory cleanup.
-- A destination-side `ferry unpack` command shipped inside packed images.
+- A destination-side `ferry unpack` command shipped inside packed images, and a
+  `ferry download <image>` command that pulls an image with go-containerregistry
+  (no Docker daemon, CLI, or socket) and extracts/unpacks it in one step.
 
 **Does not:**
 
@@ -78,7 +80,8 @@ accurate, but do not turn it into developer documentation.
 | Check for a newer release | `./ferry check-update` |
 | Self-update (root, Linux) | `sudo ./ferry self-update` |
 | Hash a password | `./ferry hash-password` |
-| Unpack an image's files | `./ferry unpack --dir ./ferry-files` |
+| Unpack already extracted files | `./ferry unpack --dir ./ferry-files` |
+| Pull an image and extract its files | `./ferry download <image>` |
 | Validate installer syntax | `bash -n deploy/install.sh` |
 
 The module is named `ferry` (not a URL). Import internal packages as
@@ -124,7 +127,7 @@ The same environment variables work for `go build`, `go vet`, and `go run`.
 ## 3. Repository map
 
 ```text
-cmd/ferry/            main, CLI (--version, hash-password, unpack, check-update, self-update), wiring, shutdown
+cmd/ferry/            main, CLI (--version, hash-password, download, unpack, check-update, self-update), wiring, shutdown
 internal/config/      environment parsing and aggregated validation
 internal/auth/        signed session cookie, bcrypt/constant-time login, IP throttling
 internal/db/          SQLite schema, migrations, job/upload/file queries
@@ -291,9 +294,15 @@ Treat it as a versioned format.
   `<lowercase-dockerhub-user>/<repo>:<tag>`.
 - Push: up to 3 attempts with 5-second backoff for retryable network errors;
   after success, re-fetch the tag and verify the manifest digest.
-- The destination extracts `/data` (`docker cp`), verifies checksums, then runs
-  `ferry unpack` for `.gz`/`.ferry` files. `ferry unpack` supports
-  `--passphrase`, `--dir`, `--verify-only`, and `--force`.
+- The destination either runs `ferry download <image>` (pulls with
+  go-containerregistry, extracts only `data/` entries, then unpacks) or extracts
+  `/data` with `docker cp` and runs `ferry unpack` for `.gz`/`.ferry` files.
+  `ferry unpack` supports `--passphrase`, `--dir`, `--verify-only`, and
+  `--force`; `ferry download` adds `--platform`, `--username`, `--password`,
+  `--insecure`, and `--dir` (default: the image tag).
+- `ferry download` is CLI-only. It must never be exposed through the web API,
+  and it must reject tar entries outside `data/`, absolute paths, `..`
+  components, and links before writing anything.
 
 Compression and encryption require Ferry to run on Linux with `FERRY_PLATFORM`
 matching `runtime.GOARCH`, because the image embeds the running Ferry binary as
@@ -565,8 +574,9 @@ Rules:
 **Change the image format or unpack behavior**
 
 1. Treat it as a compatibility change. Existing images must keep working.
-2. Update `internal/imagebuild/layer.go` (stored names, sums, manifest) and
-   `cmd/ferry/unpack.go` together.
+2. Update `internal/imagebuild/layer.go` (stored names, sums, manifest),
+   `cmd/ferry/unpack.go`, and the `data/` extraction in
+   `cmd/ferry/download.go` together.
 3. Update `README.md` and the in-image `README-FERRY.txt` text.
 4. Add/extend tests for checksums, manifest entries, compression, encryption,
    and unpack round-trips.

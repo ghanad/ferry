@@ -20,31 +20,44 @@ import (
 	"ferry/internal/securefile"
 )
 
+// unpackOptions controls verification and unpacking of an extracted image
+// directory. Both `ferry unpack` and `ferry download` use it.
+type unpackOptions struct {
+	Dir        string
+	Passphrase string
+	VerifyOnly bool
+	Force      bool
+}
+
 // unpackCommand runs inside the extracted image directory. It verifies the
 // checksum files, then decrypts .ferry files and decompresses .gz files.
 func unpackCommand(args []string) error {
 	fs := flag.NewFlagSet("unpack", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	passphrase := fs.String("passphrase", "", "job passphrase (prompted when needed)")
-	dir := fs.String("dir", ".", "directory containing the extracted image files")
-	verifyOnly := fs.Bool("verify-only", false, "only verify checksums, do not unpack")
-	force := fs.Bool("force", false, "overwrite existing output files")
+	opts := unpackOptions{}
+	fs.StringVar(&opts.Passphrase, "passphrase", "", "job passphrase (prompted when needed)")
+	fs.StringVar(&opts.Dir, "dir", ".", "directory containing the extracted image files")
+	fs.BoolVar(&opts.VerifyOnly, "verify-only", false, "only verify checksums, do not unpack")
+	fs.BoolVar(&opts.Force, "force", false, "overwrite existing output files")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
 		return err
 	}
+	return runUnpack(opts)
+}
 
-	entries, err := os.ReadDir(*dir)
+func runUnpack(opts unpackOptions) error {
+	entries, err := os.ReadDir(opts.Dir)
 	if err != nil {
-		return fmt.Errorf("read directory %s: %w", *dir, err)
+		return fmt.Errorf("read directory %s: %w", opts.Dir, err)
 	}
 
 	checksumFiles := 0
 	verified := 0
 	for _, name := range []string{"SHA256SUMS", "MD5SUMS"} {
-		path := filepath.Join(*dir, name)
+		path := filepath.Join(opts.Dir, name)
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -52,7 +65,7 @@ func unpackCommand(args []string) error {
 			return err
 		}
 		checksumFiles++
-		n, err := verifyChecksumFile(path, *dir, name)
+		n, err := verifyChecksumFile(path, opts.Dir, name)
 		verified += n
 		if err != nil {
 			return err
@@ -63,11 +76,11 @@ func unpackCommand(args []string) error {
 	} else {
 		fmt.Printf("Verified %d checksum entries.\n", verified)
 	}
-	if *verifyOnly {
+	if opts.VerifyOnly {
 		return nil
 	}
 
-	tasks, err := unpackTasks(*dir, entries)
+	tasks, err := unpackTasks(opts.Dir, entries)
 	if err != nil {
 		return err
 	}
@@ -77,7 +90,7 @@ func unpackCommand(args []string) error {
 			needsPassphrase = true
 		}
 	}
-	if needsPassphrase && *passphrase == "" {
+	if needsPassphrase && opts.Passphrase == "" {
 		if !term.IsTerminal(int(os.Stdin.Fd())) {
 			return errors.New("encrypted files found; pass --passphrase or run interactively")
 		}
@@ -87,7 +100,7 @@ func unpackCommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		*passphrase = string(raw)
+		opts.Passphrase = string(raw)
 	}
 
 	unpacked := 0
@@ -96,11 +109,11 @@ func unpackCommand(args []string) error {
 			task.Original == "." || task.Original == ".." {
 			return fmt.Errorf("refusing unsafe output name %q", task.Original)
 		}
-		finalPath := filepath.Join(*dir, task.Original)
-		if _, err := os.Stat(finalPath); err == nil && !*force {
+		finalPath := filepath.Join(opts.Dir, task.Original)
+		if _, err := os.Stat(finalPath); err == nil && !opts.Force {
 			return fmt.Errorf("output file %q already exists; use --force to overwrite", task.Original)
 		}
-		if err := unpackOne(filepath.Join(*dir, task.Stored), finalPath, *passphrase, *dir, task.Compressed, task.Encrypted); err != nil {
+		if err := unpackOne(filepath.Join(opts.Dir, task.Stored), finalPath, opts.Passphrase, opts.Dir, task.Compressed, task.Encrypted); err != nil {
 			return fmt.Errorf("unpack %s: %w", task.Stored, err)
 		}
 		fmt.Printf("Unpacked %s -> %s\n", task.Stored, task.Original)
