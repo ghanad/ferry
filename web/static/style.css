@@ -71,7 +71,8 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   display: flex;
   gap: 1rem;
   justify-content: space-between;
-  padding: 0.8rem clamp(1rem, 4vw, 2.5rem);
+  min-height: 3rem;
+  padding: 0.4rem clamp(1rem, 4vw, 2.5rem);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -80,23 +81,30 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .brand {
   align-items: center; color: var(--text); display: inline-flex;
-  font-size: 1.18rem; font-weight: 800; gap: 0.5rem;
+  flex: 0 0 auto; font-size: 1.02rem; font-weight: 800; gap: 0.45rem;
   letter-spacing: -0.02em;
 }
 .brand:hover { text-decoration: none; }
 .brand-large { font-size: 1.6rem; margin-bottom: 1.4rem; }
 
 .brand-mark {
-  align-items: center; background: var(--primary); border-radius: 9px;
-  color: #fff; display: inline-flex; font-size: 1rem; height: 2rem;
-  justify-content: center; width: 2rem;
+  align-items: center; background: var(--primary); border-radius: 8px;
+  color: #fff; display: inline-flex; font-size: 0.9rem; height: 1.7rem;
+  justify-content: center; width: 1.7rem;
 }
 .brand-large .brand-mark { font-size: 1.3rem; height: 2.7rem; width: 2.7rem; }
 
-.site-nav { align-items: center; display: flex; flex-wrap: wrap; gap: 0.8rem; font-size: 0.93rem; }
+.site-nav {
+  align-items: center; display: flex; flex-wrap: wrap; gap: 0.55rem;
+  font-size: 0.88rem; min-width: 0;
+}
+.site-nav > a, .site-nav .button { flex: 0 0 auto; white-space: nowrap; }
+.site-nav .button { font-size: 0.85rem; padding: 0.32rem 0.55rem; }
 .user-chip {
   background: var(--surface-soft); border-radius: 999px; color: var(--muted);
-  font-size: 0.83rem; font-weight: 650; padding: 0.28rem 0.68rem;
+  flex: 0 1 auto; font-size: 0.78rem; font-weight: 650; max-width: 12rem;
+  min-width: 0; overflow: hidden; padding: 0.2rem 0.6rem;
+  text-overflow: ellipsis; white-space: nowrap;
 }
 .inline-form { display: inline; margin: 0; }
 
@@ -165,6 +173,7 @@ input:focus, button:focus-visible, a:focus-visible, .dropzone:focus {
 .alert { border-radius: var(--radius-small); margin: 0.8rem 0; padding: 0.72rem 0.85rem; }
 .alert-error { background: var(--danger-soft); border: 1px solid #f2c8ca; color: var(--danger); }
 .alert-warning { background: var(--warning-soft); border: 1px solid #eeda9d; color: var(--warning); }
+.alert-info { background: var(--primary-soft); border: 1px solid #c7d7ff; color: var(--primary); }
 
 .login-page { align-items: center; display: flex; justify-content: center; min-height: 100vh; padding: 1rem; }
 .login-card {
@@ -343,8 +352,16 @@ tbody tr:hover { background: #fbfcff; }
 }
 
 @media (max-width: 720px) {
-  .site-header { align-items: flex-start; flex-direction: column; gap: 0.55rem; position: static; }
-  .site-nav { gap: 0.6rem; }
+  .site-header {
+    gap: 0.6rem; min-height: 2.9rem;
+    padding: 0.35rem clamp(0.75rem, 4vw, 1.25rem);
+    position: static;
+  }
+  .site-nav { flex-wrap: nowrap; gap: 0.45rem; font-size: 0.85rem; }
+  .site-nav .button { padding: 0.28rem 0.45rem; }
+  .site-header .brand { font-size: 0.98rem; gap: 0.4rem; }
+  .site-header .brand-mark { font-size: 0.85rem; height: 1.6rem; width: 1.6rem; }
+  .user-chip { font-size: 0.74rem; padding: 0.16rem 0.5rem; }
   .hero { align-items: flex-start; flex-direction: column; gap: 1rem; }
   .hero .button { width: 100%; }
   .job-heading { align-items: flex-start; flex-direction: column; }
