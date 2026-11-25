@@ -101,6 +101,50 @@ func TestStoreLifecycle(t *testing.T) {
 	}
 }
 
+func TestListActive(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(filepath.Join(dir, "ferry.db"), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+
+	draftID := "10000000000000000000000000000001"
+	queuedID := "10000000000000000000000000000002"
+	runningID := "10000000000000000000000000000003"
+	doneID := "10000000000000000000000000000004"
+	for _, id := range []string{draftID, queuedID, runningID, doneID} {
+		if _, err := store.CreateJob(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.Transition(ctx, queuedID, StateDraft, StateQueued, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transition(ctx, runningID, StateDraft, StateQueued, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transition(ctx, runningID, StateQueued, StateDownloading, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Complete(ctx, doneID, "user/ferry:job-1", 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	active, err := store.ListActive(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(active) != 2 {
+		t.Fatalf("active jobs = %d, want 2", len(active))
+	}
+	if active[0].ID != queuedID || active[1].ID != runningID {
+		t.Fatalf("active order = %q, %q; want %q, %q",
+			active[0].ID, active[1].ID, queuedID, runningID)
+	}
+}
+
 func TestDeleteStaleDraft(t *testing.T) {
 	dir := t.TempDir()
 	store, err := Open(filepath.Join(dir, "ferry.db"), dir)

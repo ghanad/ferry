@@ -91,6 +91,7 @@
 
       <div class="start-row">
         <button id="start-button" class="button button-primary button-large" type="button" disabled aria-describedby="start-hint">Start transfer</button>
+        <button id="discard-draft" class="button button-quiet js-discard-job" data-job-id="{{.JobID}}" type="button" disabled>Delete draft</button>
         <p id="start-hint" class="hint">Add at least one file or URL.</p>
       </div>
     </section>
@@ -109,7 +110,8 @@
       <p id="run-options" class="hint" hidden></p>
       <div class="start-row">
         <button id="cancel-button" class="button button-danger" type="button">Cancel transfer</button>
-        <p class="hint">Cancelling stops the current step and deletes all temporary files.</p>
+        <button class="button button-quiet js-discard-job" data-job-id="{{.JobID}}" type="button">Cancel &amp; clean up</button>
+        <p class="hint">Cancelling stops the current step and deletes all temporary files. Cleaning up also removes the transfer record.</p>
       </div>
       <h3>Log</h3>
       <pre id="job-log" class="log">Waiting…</pre>
@@ -128,6 +130,8 @@
       <pre id="pull-commands" class="commands"></pre>
       <button id="copy-commands" class="button" type="button">Copy commands</button>
       <p class="hint">Run <code>docker login</code> first if that machine is not logged in. The image is private, so the destination must have access to the same Docker Hub account.</p>
+      <p class="hint">Deleting this transfer removes only the history record. Use <strong>Delete image</strong> on the History page to remove the Docker Hub tag.</p>
+      <button class="button button-quiet js-discard-job" data-job-id="{{.JobID}}" type="button">Delete this transfer</button>
       <h3>Log</h3>
       <pre id="done-log" class="log"></pre>
     </section>
@@ -136,7 +140,8 @@
       <div class="failure-mark" aria-hidden="true">!</div>
       <h2>Transfer failed</h2>
       <p id="failure-message" class="alert alert-error" role="alert"></p>
-      <p class="muted">The uploaded and downloaded files have already been deleted from the server. Fix the problem and create a new transfer.</p>
+      <p class="muted">The uploaded and downloaded files have already been deleted from the server. Fix the problem and create a new transfer, or delete this record.</p>
+      <button class="button button-quiet js-discard-job" data-job-id="{{.JobID}}" type="button">Delete this transfer</button>
       <h3>Log</h3>
       <pre id="failed-log" class="log"></pre>
     </section>

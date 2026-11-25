@@ -201,11 +201,16 @@ draft -> queued -> downloading -> building -> pushing -> done
 
 Invariants:
 
-- Only one job runs at a time. `Manager.Current()` exposes it for the home page.
+- Only one job runs at a time. `Manager.Current()` exposes the worker's job, and
+  `Store.ListActive()` returns every queued/running job (oldest first) so the
+  home page still shows an unfinished transfer after a page reload.
 - Request paths use `Store.Transition(ctx, id, from, to, msg)` for atomic
   compare-and-set transitions. Only the worker uses `Store.SetState`.
 - Cancelling a queued job marks it failed immediately. Cancelling a running job
   cancels its context; the worker records `cancelled by user`.
+- `Manager.Discard` is the cleanup path: it cancels an active job, waits for it
+  to reach a terminal state, then deletes the record and job directory. It
+  never deletes the Docker Hub tag.
 - On restart, `downloading`/`building`/`pushing` jobs are failed with
   `interrupted by restart`, their directories removed, and any recorded tag
   deleted. `queued` jobs are re-enqueued.

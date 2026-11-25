@@ -76,6 +76,7 @@
                 {{end}}
                 {{if isActive .State}}
                 <button class="button button-small button-danger js-cancel-job" data-job-id="{{.ID}}" type="button">Cancel</button>
+                <button class="button button-small button-quiet js-discard-job" data-job-id="{{.ID}}" type="button">Cancel &amp; delete</button>
                 {{else}}
                 <button class="button button-small button-quiet js-delete-record" data-job-id="{{.ID}}" type="button">Delete record</button>
                 {{end}}

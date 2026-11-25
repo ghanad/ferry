@@ -44,7 +44,7 @@
         </div>
         <span class="badge badge-{{.Current.State}}">{{state .Current.State}}</span>
       </div>
-      <p class="muted">{{if .CurrentProgress.Text}}{{.CurrentProgress.Text}}{{else}}Starting…{{end}}</p>
+      <p class="muted">{{if .CurrentProgress.Text}}{{.CurrentProgress.Text}}{{else}}Starting…{{end}}{{if gt .QueuedCount 0}} · {{.QueuedCount}} more queued{{end}}</p>
       {{if gt .CurrentProgress.Total 0}}
       <progress max="{{.CurrentProgress.Total}}" value="{{.CurrentProgress.Done}}" aria-label="Current transfer progress"></progress>
       <p class="hint">{{bytes .CurrentProgress.Done}} / {{bytes .CurrentProgress.Total}}</p>
@@ -52,6 +52,7 @@
       <div class="start-row">
         <a class="button button-primary" href="/jobs/{{.Current.ID}}">Open live view</a>
         <button class="button button-danger js-cancel-job" data-job-id="{{.Current.ID}}" type="button">Cancel transfer</button>
+        <button class="button button-quiet js-discard-job" data-job-id="{{.Current.ID}}" type="button">Cancel &amp; clean up</button>
       </div>
     </section>
     {{end}}
@@ -74,7 +75,10 @@
               <td><span class="badge badge-draft">{{state .State}}</span></td>
               <td>{{.FileCount}}</td>
               <td>{{bytes .TotalBytes}}</td>
-              <td><div class="actions"><a class="button button-small" href="/jobs/{{.ID}}">Open</a></div></td>
+              <td><div class="actions">
+                <a class="button button-small" href="/jobs/{{.ID}}">Open</a>
+                <button class="button button-small button-quiet js-discard-job" data-job-id="{{.ID}}" type="button">Delete draft</button>
+              </div></td>
             </tr>
             {{end}}
           </tbody>
@@ -104,7 +108,13 @@
               <td>{{.FileCount}}</td>
               <td>{{bytes .TotalBytes}}</td>
               <td class="mono wrap">{{if .Image}}{{.Image}}{{else}}—{{end}}</td>
-              <td><div class="actions"><a class="button button-small" href="/jobs/{{.ID}}">Open</a></div></td>
+              <td><div class="actions">
+                <a class="button button-small" href="/jobs/{{.ID}}">Open</a>
+                {{if isActive .State}}
+                <button class="button button-small button-danger js-cancel-job" data-job-id="{{.ID}}" type="button">Cancel</button>
+                <button class="button button-small button-quiet js-discard-job" data-job-id="{{.ID}}" type="button">Clean up</button>
+                {{end}}
+              </div></td>
             </tr>
             {{end}}
           </tbody>

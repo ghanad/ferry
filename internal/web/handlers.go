@@ -26,6 +26,7 @@ type indexView struct {
 	Recent          []db.Job
 	Current         *db.Job
 	CurrentProgress jobs.Progress
+	QueuedCount     int
 	Error           string
 }
 
@@ -37,11 +38,15 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, session *au
 		return
 	}
 	view := indexView{User: session.Username, CSRF: session.CSRF}
-	if currentID, progress := s.jobs.Current(); currentID != "" {
-		if currentJob, err := s.store.GetJob(r.Context(), currentID); err == nil {
-			view.Current = currentJob
-			view.CurrentProgress = progress
-		}
+	// Show the oldest queued or running job even when the worker has not
+	// picked it up yet, so reloading the page always surfaces an unfinished
+	// transfer.
+	if active, err := s.store.ListActive(r.Context()); err != nil {
+		s.logger.Error("list active jobs for home page", "error", err)
+	} else if len(active) > 0 {
+		view.Current = &active[0]
+		view.CurrentProgress = s.jobs.Progress(active[0].ID)
+		view.QueuedCount = len(active) - 1
 	}
 	for _, job := range all {
 		if job.State == db.StateDraft {
@@ -255,6 +260,23 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, r *http.Request, _ *auth
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"state": "cancelling"})
+}
+
+// handleDiscardJob stops a transfer if it is still active and then removes its
+// record and temporary files. It is the "clean up" action for jobs that were
+// left behind when the browser was closed.
+func (s *Server) handleDiscardJob(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+	jobID := r.PathValue("jobID")
+	if err := s.jobs.Discard(r.Context(), jobID); err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			jsonErrorMsg(w, http.StatusNotFound, "That transfer does not exist.")
+			return
+		}
+		s.logger.Error("discard job", "id", jobID, "error", err)
+		jsonErrorMsg(w, http.StatusInternalServerError, "Ferry could not clean up that transfer. Check the server logs.")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleCreateUpload(w http.ResponseWriter, r *http.Request, _ *auth.Session) {

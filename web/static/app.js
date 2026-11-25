@@ -143,8 +143,31 @@
     });
   }
 
+  function bindDiscardButtons() {
+    document.querySelectorAll('.js-discard-job').forEach((button) => {
+      if (button.dataset.bound === 'true') return;
+      button.dataset.bound = 'true';
+      button.addEventListener('click', async () => {
+        const id = button.dataset.jobId;
+        if (!id) return;
+        if (!window.confirm('Stop this transfer (if it is running) and delete its record and temporary files? This cannot be undone. A Docker Hub image tag is not deleted.')) return;
+        clearError();
+        setBusy(button, true);
+        try {
+          await api(`/api/jobs/${encodeURIComponent(id)}/discard`, { method: 'POST' });
+          if (page === 'history') window.location.reload();
+          else window.location.assign('/');
+        } catch (err) {
+          showError(err.message);
+          setBusy(button, false);
+        }
+      });
+    });
+  }
+
   function initIndex() {
     bindCancelButtons();
+    bindDiscardButtons();
     const button = document.getElementById('new-transfer');
     if (!button) return;
     button.addEventListener('click', async () => {
@@ -162,6 +185,7 @@
 
   function initHistory() {
     bindCancelButtons();
+    bindDiscardButtons();
     document.querySelectorAll('.js-delete-image').forEach((button) => {
       button.addEventListener('click', async () => {
         const id = button.dataset.jobId;
@@ -230,6 +254,7 @@
     const jobId = document.body.dataset.jobId;
     if (!jobId) return;
     const maxBytes = Number(document.body.dataset.maxBytes) || 0;
+    bindDiscardButtons();
 
     const els = {
       state: document.getElementById('job-state'),
@@ -256,6 +281,7 @@
       entryList: document.getElementById('entry-list'),
       start: document.getElementById('start-button'),
       startHint: document.getElementById('start-hint'),
+      discardDraft: document.getElementById('discard-draft'),
       fileInput: document.getElementById('file-input'),
       dropzone: document.getElementById('dropzone'),
       urlForm: document.getElementById('url-form'),
@@ -392,6 +418,7 @@
         els.optionsState.textContent = saved.length ? `Saved: ${saved.join(', ')}. Leave the passphrase empty to keep it.` : '';
       }
       els.start.setAttribute('aria-busy', uploading ? 'true' : 'false');
+      if (els.discardDraft) els.discardDraft.disabled = uploading;
     }
 
     function serverUploadRow(upload) {

@@ -88,6 +88,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{jobID}", s.apiAuth(s.handleGetJob))
 	mux.HandleFunc("POST /api/jobs/{jobID}/start", s.apiAuth(s.handleStartJob))
 	mux.HandleFunc("POST /api/jobs/{jobID}/cancel", s.apiAuth(s.handleCancelJob))
+	mux.HandleFunc("POST /api/jobs/{jobID}/discard", s.apiAuth(s.handleDiscardJob))
 	mux.HandleFunc("POST /api/jobs/{jobID}/uploads", s.apiAuth(s.handleCreateUpload))
 	mux.HandleFunc("PUT /api/jobs/{jobID}/uploads/{uploadID}", s.apiAuth(s.handleUploadChunk))
 	mux.HandleFunc("GET /api/jobs/{jobID}/uploads/{uploadID}", s.apiAuth(s.handleGetUpload))

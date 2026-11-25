@@ -356,7 +356,9 @@ internet, and that no other web server owns those ports.
 
 ## How to use Ferry
 
-1. Log in. The home page shows the **current job** if one is running.
+1. Log in. The home page shows the **current job** whenever a transfer is
+   queued or running, even if you closed the browser and came back later. Open
+   it to see the live state again.
 2. Click **New transfer**.
 3. Add files by drag-and-drop or by choosing them. Files upload in 8 MiB chunks
    and resume automatically after a short network interruption.
@@ -374,7 +376,9 @@ internet, and that no other web server owns those ports.
 7. Press **Start transfer**. The page shows the live state, per-URL download
    progress, push bytes, and a log, refreshed every 2 seconds.
 8. Use **Cancel transfer** to stop a queued or running job. Temporary files are
-   deleted.
+   deleted. Use **Cancel & clean up** to stop the job *and* remove its history
+   record. On a finished job, **Delete this transfer** removes the record; it
+   does not delete the Docker Hub tag.
 9. When done, copy the image name and the commands for the destination machine.
 
 On the destination machine:
@@ -419,6 +423,7 @@ command is `sh`, base image is `busybox:stable`.
 
 - **Open** — return to a job.
 - **Cancel** — stop a queued or running job.
+- **Cancel & delete** — stop a queued or running job and remove its record.
 - **Delete image** — remove the tag from Docker Hub, keep the history record.
 - **Delete record** — remove the SQLite record. It does **not** delete the tag.
 - **Delete all images older than N days** — bulk-delete Docker Hub tags for
@@ -533,7 +538,11 @@ Use a small private `ferry` repository while testing.
     `sudo ls -la /var/lib/ferry/jobs`. The finished job's directory must be gone.
 11. **Cancel** — start a large job and press **Cancel transfer**. The job becomes
     `failed` with "cancelled by user" and its directory is removed.
-12. **Delete the tag** — on the History page click **Delete image**, confirm the
+12. **Reopen and clean up** — start a large job, close the browser tab, and open
+    Ferry again. The home page must still show the running (or queued) transfer
+    with its live progress. Press **Cancel & clean up**: the job stops, its
+    record disappears, and `/var/lib/ferry/jobs/<job-id>` is gone.
+13. **Delete the tag** — on the History page click **Delete image**, confirm the
     tag disappears from Docker Hub, then repeat with **Delete all images older
     than N days**.
 

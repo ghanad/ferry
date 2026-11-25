@@ -399,6 +399,28 @@ func (s *Store) ListByState(ctx context.Context, state string) ([]Job, error) {
 	return out, rows.Err()
 }
 
+// ListActive returns queued and running jobs, oldest first. The first entry is
+// the job the worker is processing (or will process next).
+func (s *Store) ListActive(ctx context.Context) ([]Job, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, state, created_at, updated_at, finished_at,
+		total_bytes, file_count, image, error, image_deleted, compress, encrypted, passphrase_enc FROM jobs
+		WHERE state IN (?, ?, ?, ?) ORDER BY created_at ASC, rowid ASC`,
+		StateQueued, StateDownloading, StateBuilding, StatePushing)
+	if err != nil {
+		return nil, fmt.Errorf("list active jobs: %w", err)
+	}
+	defer rows.Close()
+	var out []Job
+	for rows.Next() {
+		j, err := scanJobNoLog(rows)
+		if err != nil {
+			return nil, fmt.Errorf("read active job: %w", err)
+		}
+		out = append(out, *j)
+	}
+	return out, rows.Err()
+}
+
 // ListStaleDrafts returns draft jobs untouched before cutoff.
 func (s *Store) ListStaleDrafts(ctx context.Context, cutoff time.Time) ([]Job, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, state, created_at, updated_at, finished_at,

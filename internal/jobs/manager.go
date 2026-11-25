@@ -23,6 +23,11 @@ import (
 	"ferry/internal/secretbox"
 )
 
+const (
+	discardPollInterval = 100 * time.Millisecond
+	discardTimeout      = 30 * time.Second
+)
+
 // Progress is the live, non-persisted progress shown by the job page.
 type Progress struct {
 	Text  string
@@ -277,6 +282,60 @@ func (m *Manager) Cancel(ctx context.Context, jobID string) error {
 	}
 }
 
+// Discard cancels a queued or running job (if needed), waits for the worker to
+// release it, and then deletes its database record and files. Waiting avoids a
+// race where the worker recreates a directory after the cleanup.
+func (m *Manager) Discard(ctx context.Context, jobID string) error {
+	deadline := time.Now().Add(discardTimeout)
+	cancelledState := ""
+	for {
+		job, err := m.store.GetJob(ctx, jobID)
+		if errors.Is(err, db.ErrNotFound) {
+			m.removeJobDir(jobID)
+			m.forget(jobID)
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if !db.IsActive(job.State) {
+			break
+		}
+		if time.Now().After(deadline) {
+			return errors.New("the transfer did not stop in time; try again")
+		}
+		// Cancel once per state. A queued job may start between the read and
+		// the cancel; the next loop iteration sees the new state and retries.
+		if job.State != cancelledState {
+			if err := m.Cancel(ctx, jobID); err == nil {
+				cancelledState = job.State
+			} else {
+				m.logger.Debug("discard cancel retry", "id", jobID, "error", err)
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(discardPollInterval):
+		}
+	}
+	if err := m.store.DeleteJob(ctx, jobID); err != nil {
+		return err
+	}
+	m.removeJobDir(jobID)
+	m.forget(jobID)
+	return nil
+}
+
+func (m *Manager) forget(jobID string) {
+	m.mu.Lock()
+	delete(m.progress, jobID)
+	m.mu.Unlock()
+	m.cancelMu.Lock()
+	delete(m.userCancelled, jobID)
+	m.cancelMu.Unlock()
+}
+
 func (m *Manager) wasUserCancelled(jobID string) bool {
 	m.cancelMu.Lock()
 	defer m.cancelMu.Unlock()
@@ -480,6 +539,7 @@ func (m *Manager) process(ctx context.Context, jobID string) {
 		}
 		m.mu.Unlock()
 		m.cleanupJobDirIfTerminal(jobID)
+		m.forget(jobID)
 	}()
 	defer func() {
 		if r := recover(); r != nil {
@@ -493,6 +553,10 @@ func (m *Manager) process(ctx context.Context, jobID string) {
 	}()
 
 	job, err := m.store.GetJob(ctx, jobID)
+	if errors.Is(err, db.ErrNotFound) {
+		// The job was discarded before the worker reached it.
+		return
+	}
 	if err != nil {
 		m.logger.Error("load queued job", "id", jobID, "error", err)
 		return
